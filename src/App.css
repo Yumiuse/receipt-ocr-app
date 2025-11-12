@@ -1,3 +1,18 @@
+
+/*
+.btn::before - エフェクト用
+.btn:hover - マウスを乗せた時
+.btn-select - 画像選択ボタンの色
+.btn-ocr - OCRボタンの色
+
+.btn - ボタンそのものの大きさ
+padding: 10px 20px;
+font-size: 0.9rem;
+*/
+
+
+
+
 * {
     margin: 0;
     padding: 0;
@@ -77,10 +92,10 @@ h1 {
 
 .btn {
     position: relative;
-    padding: 10px 20px;
+    padding: 13px 20px;
     border: none;
     border-radius: 25px;
-    font-size: 0.9rem;
+    font-size: 1.3rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;

@@ -10,6 +10,11 @@ function App() {
   const [fileSize, setFileSize] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [message, setMessage] = useState({ show: false, text: '', type: '' });
+  // 複数ファイル対応用の State（11/13追加）
+  const [fileQueue, setFileQueue] = useState([]);
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
+  const [processedFiles, setProcessedFiles] = useState([]);
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
@@ -27,32 +32,55 @@ function App() {
   };
 
   const handleChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-      if (!validTypes.includes(file.type)) {
-        alert('JPG、PNG、GIF形式の画像を選択してください');
-        return;
-      }
-
-      const maxSize = 5 * 1024 * 1024;
-      if (file.size > maxSize) {
-        alert('ファイルサイズは5MB以下にしてください');
-        return;
-      }
-
-      setOcrText('');
-      setStructuredData(null);
-      setIsLoading(false);
-
-      setFileName(file.name.length > 20 ? file.name.substring(0, 17) + '...' : file.name);
-      setFileSize(formatFileSize(file.size));
-
-      const reader = new FileReader();
-      reader.onload = (event) => setImage(event.target.result);
-      reader.readAsDataURL(file);
+  const files = Array.from(e.target.files);  // ← 全てのファイルを配列で取得
+  
+  if (files.length === 0) return;
+  
+  // バリデーション：各ファイルをチェック
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+  const maxSize = 5 * 1024 * 1024;
+  
+  for (let file of files) {
+    if (!validTypes.includes(file.type)) {
+      alert(`${file.name} はサポートされていない形式です。JPG、PNG、GIF形式の画像を選択してください`);
+      return;
     }
-  };
+    if (file.size > maxSize) {
+      alert(`${file.name} のファイルサイズが大きすぎます。5MB以下にしてください`);
+      return;
+    }
+  }
+  
+  // 複数ファイルの情報を準備
+  const fileInfos = files.map((file, index) => ({
+    id: Date.now() + index,
+    file: file,
+    name: file.name,
+    status: '待機中',
+    preview: URL.createObjectURL(file)
+  }));
+  
+  // キューに追加
+  setFileQueue(fileInfos);
+  setCurrentFileIndex(0);
+  
+  // 最初のファイルを表示
+  const firstFile = files[0];
+  setFileName(firstFile.name.length > 20 ? firstFile.name.substring(0, 17) + '...' : firstFile.name);
+  setFileSize(formatFileSize(firstFile.size));
+  
+  const reader = new FileReader();
+  reader.onload = (event) => setImage(event.target.result);
+  reader.readAsDataURL(firstFile);
+  
+  // OCR結果をクリア
+  setOcrText('');
+  setStructuredData(null);
+  setIsLoading(false);
+  
+  // メッセージ表示
+  alert(`${files.length}個のファイルが選択されました`);
+};
 
   const handleOCR = async () => {
     setIsLoading(true);
@@ -250,8 +278,120 @@ ${ocrText}
               accept="image/*"
               onChange={handleChange}
               style={{ display: 'none' }}
+              multiple
             />
           </div>
+          {/* 処理状況の表示（11/13追加） */}
+          {/* 処理状況の表示と次のファイルボタン（11/13追加） */}
+          {fileQueue.length > 0 && (
+            <div style={{ display: 'flex', gap: '10px', marginTop: '15px', alignItems: 'stretch' }}>
+              <div style={{
+                flex: 1,
+                padding: '15px',
+                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.12) 100%)',
+border: '2px solid rgba(102, 126, 234, 0.3)',
+                borderRadius: '12px',
+                color: 'white',
+                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)'
+              }}>
+                <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#5E35B1' }}>
+  📋 処理状況: {currentFileIndex + 1} / {fileQueue.length} ファイル
+</h3>
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  flexWrap: 'wrap',
+                  marginTop: '10px'
+                }}>
+                  {fileQueue.map((file, index) => (
+                    <div 
+                      key={file.id} 
+                      onClick={() => {
+                        setCurrentFileIndex(index);
+                        const selectedFile = fileQueue[index].file;
+                        setFileName(selectedFile.name.length > 20 ? selectedFile.name.substring(0, 17) + '...' : selectedFile.name);
+                        setFileSize(formatFileSize(selectedFile.size));
+                        const reader = new FileReader();
+                        reader.onload = (event) => setImage(event.target.result);
+                        reader.readAsDataURL(selectedFile);
+                        setOcrText('');
+                        setStructuredData(null);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        background: index === currentFileIndex ? 'linear-gradient(135deg, #7C4DFF 0%, #B388FF 100%)' : 
+           index < currentFileIndex ? 'linear-gradient(135deg, #B39DDB 0%, #D1C4E9 100%)' : 
+           'rgba(124, 77, 255, 0.15)',
+                        color: 'white',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        fontWeight: index === currentFileIndex ? 'bold' : 'normal',
+                        border: index === currentFileIndex ? '2px solid #FFD700' : 'none',
+boxShadow: index === currentFileIndex ? '0 4px 12px rgba(124, 77, 255, 0.4)' : 'none',
+                        transition: 'all 0.3s ease',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {index + 1}. {file.name.substring(0, 12)}...
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              
+            </div>
+          )}
+
+                    {/* 次のファイルボタン（左側配置・11/13追加） */}
+          {fileQueue.length > 1 && (
+            <button
+              onClick={() => {
+                const nextIndex = (currentFileIndex + 1) % fileQueue.length;
+                setCurrentFileIndex(nextIndex);
+
+                const nextFile = fileQueue[nextIndex].file;
+                setFileName(nextFile.name.length > 20 ? nextFile.name.substring(0, 17) + '...' : nextFile.name);
+                setFileSize(formatFileSize(nextFile.size));
+
+                const reader = new FileReader();
+                reader.onload = (event) => setImage(event.target.result);
+                reader.readAsDataURL(nextFile);
+
+                setOcrText('');
+                setStructuredData(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                marginTop: '15px',
+                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%)',
+boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                transition: 'all 0.3s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 6px 20px rgba(255, 183, 77, 0.6)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 4px 15px rgba(255, 183, 77, 0.3)';;
+              }}
+            >
+              {currentFileIndex === fileQueue.length - 1 ? '最初に戻る →' : '次のファイルへ →'}
+            </button>
+          )}
+
+
+          
+          {/* 次のファイルボタン（コンパクト版・11/13追加） */}
+          
 
           <div className={`preview-area left-preview ${image ? 'has-content' : ''}`}>
             {fileName && (
@@ -329,9 +469,18 @@ ${ocrText}
                 '保存'
               )}
             </button>
-          </div>
 
-          <div className={`preview-area right-preview ${ocrText || structuredData ? 'has-content' : ''}`}>
+            
+            
+          </div>
+          
+
+          
+
+          <div 
+  className={`preview-area right-preview ${ocrText || structuredData ? 'has-content' : ''}`}
+  style={{ marginTop: fileQueue.length > 0 ? ' 15px' : '0' }}
+>
             {!ocrText && !structuredData && (
               <div className="preview-placeholder">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
