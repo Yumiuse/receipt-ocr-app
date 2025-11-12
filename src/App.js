@@ -256,6 +256,149 @@ ${ocrText}
     }
   };
 
+  // 一括処理関数（11/13追加）
+  const handleBatchProcess = async () => {
+    if (fileQueue.length === 0) {
+      alert('ファイルが選択されていません');
+      return;
+    }
+
+    setIsProcessingQueue(true);
+    showMessage('一括処理を開始します...', 'success');
+
+    for (let i = 0; i < fileQueue.length; i++) {
+      try {
+        // 現在のファイルに切り替え
+        setCurrentFileIndex(i);
+        const currentFile = fileQueue[i].file;
+        
+        // ファイルを読み込み
+        const base64Image = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            setImage(event.target.result);
+            resolve(event.target.result.split(',')[1]);
+          };
+          reader.readAsDataURL(currentFile);
+        });
+
+        // 1秒待機（表示を更新）
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // OCR実行
+        setOcrText('処理中...');
+        const apiKey = process.env.REACT_APP_VISION_API_KEY;
+        const requestBody = {
+          requests: [{
+            image: { content: base64Image },
+            features: [{ type: 'TEXT_DETECTION' }]
+          }]
+        };
+
+        const ocrResponse = await fetch(
+          `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+          }
+        );
+
+        const ocrData = await ocrResponse.json();
+        const ocrText = ocrData.responses[0].fullTextAnnotation?.text || '文字が検出されませんでした';
+        setOcrText(ocrText);
+
+        // 1秒待機
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // 構造化実行
+        setOcrText('OpenAIで構造化中...');
+        const openaiKey = process.env.REACT_APP_OPENAI_API_KEY;
+        
+        const structureRequestBody = {
+          model: "gpt-4o-mini",
+          messages: [{
+            role: "user",
+            content: `以下のレシートから情報を抽出してJSON形式で返してください。
+
+${ocrText}
+
+抽出項目：
+- 店名：屋号や店舗のブランド名を優先（法人名や「株式会社」「有限会社」は除外）
+- 日付：YYYY年MM月DD日形式に統一（時間は除外）
+- 合計金額：数字のみ
+- 消費税額：数字のみ
+- 品目：購入した商品名と数量をリスト化
+- 支払方法
+- 勘定科目提案：3つ提案
+
+形式：
+{
+  "店名": "屋号のみ",
+  "日付": "YYYY年MM月DD日",
+  "合計金額": 数字,
+  "消費税額": 数字,
+  "品目": ["商品名1", "商品名2"],
+  "支払方法": "...",
+  "勘定科目提案": ["科目1", "科目2", "科目3"]
+}`
+          }],
+          temperature: 0
+        };
+
+        const structureResponse = await fetch(
+          'https://api.openai.com/v1/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${openaiKey}`
+            },
+            body: JSON.stringify(structureRequestBody)
+          }
+        );
+
+        const structureData = await structureResponse.json();
+        const result = structureData.choices[0].message.content;
+        const jsonMatch = result.match(/\{[\s\S]*\}/);
+        
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          setStructuredData(parsed);
+          setOcrText('構造化完了');
+
+          // 1秒待機
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // 保存実行
+          const gasUrl = process.env.REACT_APP_GAS_URL;
+          const fd = new FormData();
+          fd.append('payload', JSON.stringify(parsed));
+
+          await fetch(gasUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: fd
+          });
+
+          showMessage(`${i + 1}/${fileQueue.length} 件目を保存しました`, 'success');
+        }
+
+      } catch (error) {
+        console.error(`ファイル ${i + 1} の処理エラー:`, error);
+        showMessage(`${i + 1}件目でエラーが発生しました`, 'success');
+      }
+
+      // 次のファイルへ進む前に少し待機
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    setIsProcessingQueue(false);
+    showMessage('全ての処理が完了しました！', 'success');
+  };
+
+
+
   return (
     <div className="app-container">
       <h1>レシート OCR アプリ</h1>
@@ -297,7 +440,51 @@ border: '2px solid rgba(102, 126, 234, 0.3)',
                 <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#5E35B1' }}>
   📋 処理状況: {currentFileIndex + 1} / {fileQueue.length} ファイル
 </h3>
+
+
+                
+                {/* 一括処理ボタン（11/13追加） */}
+                <button
+                  onClick={handleBatchProcess}
+                  disabled={isProcessingQueue}
+                  style={{
+                    width: '50  %',
+                    padding: '10px 20px',
+                    marginBottom: '15px',
+                    background: isProcessingQueue 
+                             ? 'linear-gradient(135deg, #BDBDBD 0%, #9E9E9E 100%)'
+                             : 'linear-gradient(135deg, #FF6B9D 0%, #FFA7C4 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.95rem',
+                    fontWeight: 'bold',
+                    cursor: isProcessingQueue ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 3px 12px rgba(255, 107, 157, 0.35)',
+                    transition: 'all 0.3s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isProcessingQueue) {
+                      e.target.style.transform = 'translateY(-2px)';
+                      e.target.style.boxShadow = '0 5px 15px rgba(76, 175, 80, 0.5)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isProcessingQueue) {
+                      e.target.style.transform = 'translateY(0)';
+                      e.target.style.boxShadow = '0 6px 18px rgba(255, 107, 157, 0.5)';
+                    }
+                  }}
+                >
+                  {isProcessingQueue ? '⏳ 処理中...' : ' 全ファイルを一括処理'}
+                </button>
+                
                 <div style={{
+
+
+
+
+                
                   display: 'flex',
                   gap: '8px',
                   flexWrap: 'wrap',
