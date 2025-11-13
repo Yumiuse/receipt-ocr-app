@@ -101,6 +101,7 @@ h1 {
     transition: all 0.3s ease;
     overflow: hidden;
     text-transform: none;
+    
     letter-spacing: 0.3px;
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
     min-width: 100px;
@@ -299,16 +300,35 @@ input[type="file"] {
 }
 
 .message {
-    position: fixed;
-    top: 30px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 18px 35px;
-    border-radius: 50px;
-    font-weight: 600;
-    animation: messageSlide 0.4s ease-out;
-    z-index: 1000;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  font-weight: bold;
+  animation: slideIn 0.3s ease;
+  z-index: 9999;  /* ← これを追加！最前面に表示 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);  /* 影も追加 */
+}
+
+.message-success {
+  background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
+  color: white;
+}
+
+.message-info {
+  background: linear-gradient(135deg, #2196F3 0%, #64B5F6 100%);
+  color: white;
+}
+
+.message-error {
+  background: linear-gradient(135deg, #f44336 0%, #ef5350 100%);
+  color: white;
+}
+
+.message-warning {
+  background: linear-gradient(135deg, #FF9800 0%, #FFB74D 100%);
+  color: white;
 }
 
 @keyframes messageSlide {
