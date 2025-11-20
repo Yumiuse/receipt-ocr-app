@@ -1,18 +1,3 @@
-
-/*
-.btn::before - エフェクト用
-.btn:hover - マウスを乗せた時
-.btn-select - 画像選択ボタンの色
-.btn-ocr - OCRボタンの色
-
-.btn - ボタンそのものの大きさ
-padding: 10px 20px;
-font-size: 0.9rem;
-*/
-
-
-
-
 * {
     margin: 0;
     padding: 0;
@@ -20,12 +5,13 @@ font-size: 0.9rem;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+    font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
     background: #f0f2f5;
     min-height: 100vh;
     padding: 10px;
 }
 
+/* App.cssの.app-containerを修正 */
 .app-container {
     background: white;
     border-radius: 20px;
@@ -35,9 +21,28 @@ body {
     height: calc(100vh - 20px);
     margin: 0 auto;
     padding: 20px;
-    animation: fadeIn 0.5s ease-out;
     display: flex;
     flex-direction: column;
+    overflow: hidden; /* 追加 */
+}
+
+/* .main-layoutも修正 */
+.main-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr 1fr;
+    gap: 20px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden; /* 変更 */
+    height: 100%; /* 追加 */
+}
+
+/* 各セクションにもoverflow設定 */
+.receipt-list-section,
+.center-section,
+.right-section {
+    overflow-y: auto; /* 追加：各列で個別にスクロール可能に */
+    max-height: 100%; /* 追加 */
 }
 
 @keyframes fadeIn {
@@ -60,48 +65,54 @@ h1 {
     letter-spacing: -0.5px;
 }
 
+/* ===== 3列レイアウト ===== */
 .main-layout {
-    display: flex;
-    gap: 0;
+    display: grid;
+    grid-template-columns: 300px 1fr 1fr;
+    gap: 20px;
     flex: 1;
     min-height: 0;
+    overflow: hidden;
 }
 
-.left-section, .right-section {
-    flex: 1;
+.receipt-list-section {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    height: 100%;
-    position: relative;
 }
 
-.left-section {
-    border-right: 2px solid #e0e0e0;
-    padding-right: 15px;
+.center-section {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
 }
 
 .right-section {
-    padding-left: 15px;
-}
-
-.button-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    padding: 20px;
     display: flex;
-    justify-content: center;
-    margin-bottom: 10px;
+    flex-direction: column;
 }
 
+/* ボタンスタイル */
 .btn {
     position: relative;
-    padding: 13px 20px;
+    padding: 10px 20px;
     border: none;
     border-radius: 25px;
-    font-size: 1.3rem;
+    font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
     overflow: hidden;
-    text-transform: none;
-    
     letter-spacing: 0.3px;
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
     min-width: 100px;
@@ -149,7 +160,6 @@ h1 {
 .btn-ocr {
     background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
     color: white;
-    position: relative;
 }
 
 .btn-structure {
@@ -169,6 +179,7 @@ h1 {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
+/* プレビューエリア */
 .preview-area {
     background: #f8f9fa;
     border: 2px dashed #dee2e6;
@@ -180,13 +191,8 @@ h1 {
     align-items: center;
     justify-content: center;
     position: relative;
-    overflow: hidden;
+    overflow: auto;
     transition: all 0.3s ease;
-}
-
-.preview-area.left-preview {
-    background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 20%, #ffecd2 100%);
-    border: none;
 }
 
 .preview-area.right-preview {
@@ -216,6 +222,7 @@ h1 {
     font-weight: 500;
 }
 
+/* モーダル */
 .image-modal {
     display: none;
     position: fixed;
@@ -238,6 +245,7 @@ h1 {
     object-fit: contain;
 }
 
+/* 結果表示 */
 .result-item {
     margin-bottom: 10px;
     padding: 8px 12px;
@@ -256,34 +264,7 @@ h1 {
     color: #212529;
 }
 
-.file-info {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 8px 15px;
-    border-radius: 8px;
-    display: none;
-    animation: slideDown 0.3s ease-out;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-    font-size: 0.75rem;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-input[type="file"] {
-    display: none;
-}
-
+/* ローディング */
 .loading-spinner {
     display: inline-block;
     width: 14px;
@@ -299,70 +280,61 @@ input[type="file"] {
     to { transform: rotate(360deg); }
 }
 
+/* メッセージ */
 .message {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 15px 20px;
-  border-radius: 8px;
-  font-weight: bold;
-  animation: slideIn 0.3s ease;
-  z-index: 9999;  /* ← これを追加！最前面に表示 */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);  /* 影も追加 */
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 8px;
+    font-weight: bold;
+    animation: slideIn 0.3s ease;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.message-success {
-  background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
-  color: white;
-}
-
-.message-info {
-  background: linear-gradient(135deg, #2196F3 0%, #64B5F6 100%);
-  color: white;
-}
-
-.message-error {
-  background: linear-gradient(135deg, #f44336 0%, #ef5350 100%);
-  color: white;
-}
-
-.message-warning {
-  background: linear-gradient(135deg, #FF9800 0%, #FFB74D 100%);
-  color: white;
-}
-
-@keyframes messageSlide {
+@keyframes slideIn {
     from {
-        transform: translateX(-50%) translateY(-100px);
+        transform: translateX(100%);
         opacity: 0;
     }
     to {
-        transform: translateX(-50%) translateY(0);
+        transform: translateX(0);
         opacity: 1;
     }
 }
 
 .message-success {
-    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
     color: white;
+}
+
+.message-info {
+    background: linear-gradient(135deg, #2196F3 0%, #64B5F6 100%);
+    color: white;
+}
+
+.message-error {
+    background: linear-gradient(135deg, #f44336 0%, #ef5350 100%);
+    color: white;
+}
+
+.message-warning {
+    background: linear-gradient(135deg, #FF9800 0%, #FFB74D 100%);
+    color: white;
+}
+
+/* レスポンシブ */
+@media (max-width: 1200px) {
+    .main-layout {
+        grid-template-columns: 250px 1fr 1fr;
+    }
 }
 
 @media (max-width: 968px) {
     .main-layout {
+        display: flex;
         flex-direction: column;
-        height: auto;
-    }
-    
-    .left-section {
-        border-right: none;
-        border-bottom: 2px solid #e0e0e0;
-        padding-right: 0;
-        padding-bottom: 20px;
-        margin-bottom: 20px;
-    }
-    
-    .right-section {
-        padding-left: 0;
     }
     
     .btn-group {
@@ -373,9 +345,5 @@ input[type="file"] {
         padding: 8px 15px;
         font-size: 0.8rem;
         min-width: 80px;
-    }
-    
-    .preview-area {
-        min-height: 400px;
     }
 }
