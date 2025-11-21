@@ -1,7 +1,26 @@
 import "./App.css";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 console.log("GAS URL:", process.env.REACT_APP_GAS_URL);
+function drawImageFitCenter(ctx, img, canvas) {
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const imgWidth = img.width;
+        const imgHeight = img.height;
 
+        const scale = Math.min(
+          canvasWidth / imgWidth,
+          canvasHeight / imgHeight
+        );
+
+        const drawWidth = imgWidth * scale;
+        const drawHeight = imgHeight * scale;
+
+        const offsetX = (canvasWidth - drawWidth) / 2;
+        const offsetY = (canvasHeight - drawHeight) / 2;
+
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+      }
 // ★ 画像圧縮：Vision API を高速化（超重要）★
 const compressImage = (file, maxSize = 800, quality = 0.7) => {
   return new Promise((resolve, reject) => {
@@ -20,7 +39,9 @@ const compressImage = (file, maxSize = 800, quality = 0.7) => {
       canvas.height = img.height * scale;
 
       const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      drawImageFitCenter(ctx, img, canvas);
+
+      
 
       // JPEGで圧縮率を調整（速度改善）
       const compressedBase64 = canvas.toDataURL("image/jpeg", quality);
@@ -82,6 +103,7 @@ function App() {
   const [highlightedItem, setHighlightedItem] = useState(null);
   const canvasRef = useRef(null);
   const imageRef = useRef(null);
+  const [sheetOpened, setSheetOpened] = useState(false);
 
   // ★ 画像回転用のState（新規追加）★
   const [rotation, setRotation] = useState(0);
@@ -119,24 +141,17 @@ function App() {
     setLastPanOffset({ x: 0, y: 0 });
   };
 
-  // ズーム処理（マウス位置を中心に）
-  const handleZoom = useCallback((delta, mouseX = null, mouseY = null) => {
+  // 🟦 ズームを「常に画像中央」を基点にする安定版
+  const handleZoom = useCallback((delta, centerX = null, centerY = null) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
 
-    // ズーム中心点の計算（デフォルトは画像の中央上部）
-    let centerX, centerY;
-
-    if (mouseX !== null && mouseY !== null) {
-      // マウス/タッチ位置が指定されている場合
-      centerX = mouseX - rect.left;
-      centerY = mouseY - rect.top;
-    } else {
-      // ボタンクリックの場合：中央やや上部を中心に
+    // 🔵 デフォルトはキャンバス中心
+    if (centerX === null || centerY === null) {
       centerX = rect.width / 2;
-      centerY = rect.height * 0.35; // 35%の位置（やや上部）
+      centerY = rect.height / 2;
     }
 
     setZoomLevel((prevZoom) => {
@@ -144,14 +159,14 @@ function App() {
         MIN_ZOOM,
         Math.min(MAX_ZOOM, prevZoom * (1 + delta))
       );
-      const zoomRatio = newZoom / prevZoom;
 
-      if (zoomRatio !== 1) {
-        setPanOffset((prevPan) => ({
-          x: centerX - (centerX - prevPan.x) * zoomRatio,
-          y: centerY - (centerY - prevPan.y) * zoomRatio,
-        }));
-      }
+      const ratio = newZoom / prevZoom;
+
+      // 中心基準でパン補正して画像が飛ばないようにする
+      setPanOffset((prev) => ({
+        x: centerX - (centerX - prev.x) * ratio,
+        y: centerY - (centerY - prev.y) * ratio,
+      }));
 
       return newZoom;
     });
@@ -193,66 +208,49 @@ function App() {
     if (e.touches.length === 2 && touchStartRef.current) {
       e.preventDefault();
 
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
 
-      // 現在の2本指の距離
-      const dx = touch2.clientX - touch1.clientX;
-      const dy = touch2.clientY - touch1.clientY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const dx = t2.clientX - t1.clientX;
+      const dy = t2.clientY - t1.clientY;
+      const newDistance = Math.sqrt(dx * dx + dy * dy);
 
-      // 現在の2本指の中心点
-      const currentCenter = {
-        x: (touch1.clientX + touch2.clientX) / 2,
-        y: (touch1.clientY + touch2.clientY) / 2,
-      };
+      // 🔵 ピンチの速度をもっと鈍くする（0.05 → 0.02）
+      const scale = newDistance / touchStartRef.current;
+      const delta = (scale - 1) * 0.02;
 
-      // ズーム率の計算（より自然な感覚に）
-      const scale = distance / touchStartRef.current;
-      const delta = (scale - 1) * 0.02; // 感度調整
+      // キャンバス中心をズーム中心にする
+      const rect = canvasRef.current.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
 
-      // 2本指の中心点でズーム
-      handleZoom(delta, currentCenter.x, currentCenter.y);
+      handleZoom(delta, centerX, centerY);
 
-      // パン操作も同時に行う（中心点の移動を追従）
-      if (lastTouchCenter.current && zoomLevel > 1) {
-        const panDx = currentCenter.x - lastTouchCenter.current.x;
-        const panDy = currentCenter.y - lastTouchCenter.current.y;
-
-        setPanOffset((prev) => ({
-          x: prev.x + panDx * 0.5, // パン感度を調整
-          y: prev.y + panDy * 0.5,
-        }));
-      }
-
-      touchStartRef.current = distance;
-      lastTouchCenter.current = currentCenter;
+      // 距離を更新（滑らかな連続ズーム）
+      touchStartRef.current = newDistance;
     }
   };
 
   // ドラッグ操作
   const handleMouseDown = (e) => {
-    if (e.button === 0 && zoomLevel > 1) {
+    if (zoomLevel > 1) {
       setIsDragging(true);
       setDragStart({ x: e.clientX, y: e.clientY });
       setLastPanOffset({ ...panOffset });
-      e.preventDefault();
     }
   };
 
-  const handleMouseMove = useCallback(
-    (e) => {
-      if (isDragging) {
-        const dx = e.clientX - dragStart.x;
-        const dy = e.clientY - dragStart.y;
-        setPanOffset({
-          x: lastPanOffset.x + dx,
-          y: lastPanOffset.y + dy,
-        });
-      }
-    },
-    [isDragging, dragStart, lastPanOffset]
-  );
+  const handleMouseMove = (e) => {
+    if (isDragging) {
+      const dx = e.clientX - dragStart.x;
+      const dy = e.clientY - dragStart.y;
+
+      setPanOffset({
+        x: lastPanOffset.x + dx,
+        y: lastPanOffset.y + dy,
+      });
+    }
+  };
 
   const handleMouseUp = () => {
     setIsDragging(false);
@@ -884,11 +882,16 @@ ${JSON.stringify(simplifiedOcrData, null, 2)}
         `${currentFileIndex + 1}番目のデータを保存しました！`,
         "success"
       );
+      // ★ シートは最初の1回だけ自動で開く
+      if (!sheetOpened) {
+        window.open(
+          "https://docs.google.com/spreadsheets/d/153YzguHRCzSP_JxRbadQfGnpVTj4x21mP7YvmNrC0zk/edit",
+          "_blank"
+        );
+        setSheetOpened(true);
+      }
+
       // ★ 保存成功 → Googleスプレッドシートを自動で開く
-      window.open(
-        "https://docs.google.com/spreadsheets/d/153YzguHRCzSP_JxRbadQfGnpVTj4x21mP7YvmNrC0zk/edit",
-        "_blank"
-      );
 
       const newProcessedFiles = [...processedFiles, currentFileIndex];
       setProcessedFiles(newProcessedFiles);
@@ -1060,8 +1063,8 @@ ${JSON.stringify(simplifiedOcrData, null, 2)}
       parentHeight * 4
     );
 
-    // 画像を描画
-    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+    // 画像を中央フィットで描画（ズーム前の基準位置）
+    drawImageFitCenter(ctx, img, canvas);
 
     // BBoxを描画
     if (showBoundingBoxes && structuredData) {
