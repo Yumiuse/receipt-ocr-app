@@ -10,7 +10,8 @@
 ## 🎥 デモ動画
 ## [![Demo](http://img.youtube.com/vi/動画ID/0.jpg)](https://youtu.be/動画ID)
 
-![アプリスクリーンショット](./screenshot.png)
+![アプリスクリーンショット](./public/screenshot.png)
+
 
 
 
